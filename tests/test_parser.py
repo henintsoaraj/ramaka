@@ -35,6 +35,20 @@ REFERENCE = [
     # --- Vraiment du texte : rien à additionner
     ("To taste", (None, None, "To taste")),
     ("To serve", (None, None, "To serve")),
+    # --- Ajouts : erreurs trouvées sur le second échantillon (jamais vu)
+    ("1 tbls", (1.0, "c. à soupe", "")),
+    ("1 tblsp", (1.0, "c. à soupe", "")),
+    ("1 Handfull", (1.0, "poignée", "")),
+    ("1 head", (1.0, "tête", "")),
+    ("1 scoop", (1.0, "boule", "")),
+    ("Pod of", (1.0, "gousse", "of")),
+    ("½", (0.5, None, "")),
+    ("1½ cups", (1.5, "tasse", "")),
+    ("1 (12 oz.)", (1.0, None, "(12 oz.)")),
+    # --- Garde-fous : la tolérance aux fautes ne doit PAS inventer d'unités
+    ("1 sliced", (1.0, None, "sliced")),
+    ("2 large", (2.0, None, "large")),
+    ("As required", (None, None, "As required")),
 ]
 
 

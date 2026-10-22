@@ -1,3 +1,4 @@
+import difflib
 import re
 from collections import Counter
 
@@ -22,7 +23,29 @@ UNITS = {
     "bunch": "botte", "bunches": "botte",
     "knob": "noix",
     "dash": "trait", "splash": "trait",
+    # Ajouts de la version 3 (repérés dans le second échantillon)
+    "head": "tête", "heads": "tête",
+    "pot": "pot", "pots": "pot",
+    "scoop": "boule", "scoops": "boule",
+    "pod": "gousse", "pods": "gousse",
 }
+
+# Fractions écrites en un seul caractère
+UNICODE_FRACTIONS = {"½": "1/2", "¼": "1/4", "¾": "3/4", "⅓": "1/3", "⅔": "2/3"}
+
+
+def find_unit(word):
+    """Unité normalisée d'un mot, en tolérant les fautes de frappe ; None sinon."""
+    w = word.lower().strip(".")
+    if w in UNITS:
+        return UNITS[w]
+    # Pas de tolérance sur les mots courts, ni sur les préparations en -ed
+    # ("sliced" ressemble à 91 % à "slice", mais c'est une préparation, pas une unité)
+    if len(w) >= 4 and not w.endswith("ed"):
+        close = difflib.get_close_matches(w, UNITS.keys(), n=1, cutoff=0.85)
+        if close:
+            return UNITS[close[0]]
+    return None
 
 # Nombres écrits en lettres
 NUMBER_WORDS = {"one": 1, "two": 2, "three": 3, "four": 4, "five": 5,
@@ -57,13 +80,26 @@ def parse_measure(text):
     """Renvoie (quantité, unité, note). quantité et unité peuvent valoir None."""
     text = text.strip()
 
+    # Préparation : fractions en un caractère ("½" -> "1/2", "1½" -> "1 1/2")
+    for char, fraction in UNICODE_FRACTIONS.items():
+        text = re.sub(rf"(\d)\s*{char}", rf"\1 {fraction}", text)
+        text = text.replace(char, fraction)
+
+    # Préparation : une précision entre parenthèses rejoint la note ("1 (12 oz.)")
+    extra = " ".join(re.findall(r"\(.*?\)", text))
+    if extra:
+        text = re.sub(r"\(.*?\)", " ", text).strip()
+        quantity, unit, note = parse_measure(text)
+        return quantity, unit, f"{note} {extra}".strip()
+
     # Règle 1 : nombre au début ("2 tbsp", "200g", "1 chopped")
     match = AT_START.match(text)
     if match:
         number, word, rest = match.groups()
         quantity = to_float(number)
-        if word and word.lower() in UNITS:
-            return quantity, UNITS[word.lower()], rest.strip()
+        unit = find_unit(word) if word else None
+        if unit:
+            return quantity, unit, rest.strip()
         # Le mot n'est pas une unité connue ("1 chopped") : il rejoint la note
         return quantity, None, f"{word or ''} {rest}".strip()
 
@@ -77,9 +113,10 @@ def parse_measure(text):
     # Règle 3 : une unité sans nombre ("Pinch", "Large handful") : 1 sous-entendu
     words = text.split()
     for i, w in enumerate(words):
-        if w.lower() in UNITS:
+        unit = find_unit(w)
+        if unit:
             note = " ".join(words[:i] + words[i + 1:])
-            return 1.0, UNITS[w.lower()], note
+            return 1.0, unit, note
 
     # Règle 4 : vraiment du texte ("To taste") : une note, rien à additionner
     return None, None, text
