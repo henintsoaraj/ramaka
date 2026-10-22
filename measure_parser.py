@@ -28,6 +28,8 @@ UNITS = {
     "pot": "pot", "pots": "pot",
     "scoop": "boule", "scoops": "boule",
     "pod": "gousse", "pods": "gousse",
+    "jar": "bocal", "jars": "bocal",
+    "pound": "livre", "pounds": "livre",
 }
 
 # Fractions écrites en un seul caractère
