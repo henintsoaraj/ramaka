@@ -17,7 +17,7 @@ spec:
         - name: ghcr-pull            # le Secret que tu viens de créer
       containers:
         - name: api
-          image: ghcr.io/henintsoaraj/ramaka:d174aefe3b6d1f5c7a9ddffe45fd8a411d853088   # le SHA du commit publié
+          image: ghcr.io/henintsoaraj/ramaka:c52b0417effd3ae2741ce6fbd54184eb63c03fa1   # le SHA du commit publié
           ports:
             - containerPort: 8000
           readinessProbe:
