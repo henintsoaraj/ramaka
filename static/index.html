@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ramaka</title>
+<style>
+  :root {
+    --bg: #fbf7f1; --card: #ffffff; --ink: #2b2420; --muted: #8a7d72;
+    --accent: #c8553d; --accent-soft: #f6e3dc; --line: #eadfd3; --ok: #4f7a5a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1d1916; --card: #27221e; --ink: #f1e9e1; --muted: #a89a8d;
+      --accent: #e07a5f; --accent-soft: #3a2a24; --line: #3a322c; --ok: #8fbf98;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.4;
+  }
+  header { padding: 20px 16px 8px; max-width: 640px; margin: 0 auto; }
+  h1 { margin: 0; font-size: 1.6rem; color: var(--accent); }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: .9rem; }
+  main { max-width: 640px; margin: 0 auto; padding: 8px 16px 40px; }
+  section { background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+            padding: 14px; margin-top: 14px; }
+  h2 { margin: 0 0 10px; font-size: 1rem; }
+  .search { display: flex; gap: 8px; }
+  input[type=search] { flex: 1; min-width: 0; padding: 11px 12px; font-size: 1rem;
+    border: 1px solid var(--line); border-radius: 10px; background: var(--bg); color: var(--ink); }
+  button { border: 0; border-radius: 10px; padding: 11px 14px; font-size: .95rem;
+           background: var(--accent); color: #fff; cursor: pointer; }
+  button.ghost { background: var(--accent-soft); color: var(--accent); }
+  button:disabled { opacity: .5; cursor: default; }
+  .results { display: grid; gap: 8px; margin-top: 10px; }
+  .meal { display: flex; align-items: center; gap: 10px; }
+  .meal img { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; flex: none; }
+  .meal .info { flex: 1; min-width: 0; }
+  .meal .name { font-weight: 600; overflow-wrap: anywhere; }
+  .meal .origin { color: var(--muted); font-size: .85rem; }
+  .meal button { padding: 8px 12px; flex: none; }
+  .empty, .status { color: var(--muted); font-size: .9rem; }
+  .chosen { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { background: var(--accent-soft); color: var(--accent); border-radius: 999px;
+          padding: 6px 10px; font-size: .9rem; display: flex; align-items: center; gap: 6px; }
+  .chip button { background: none; color: inherit; padding: 0 2px; font-size: 1rem; }
+  .actions { margin-top: 12px; }
+  .actions button { width: 100%; }
+  ul.list { list-style: none; margin: 0; padding: 0; }
+  ul.list li { border-bottom: 1px solid var(--line); }
+  ul.list li:last-child { border-bottom: 0; }
+  ul.list label { display: flex; align-items: center; gap: 10px; padding: 10px 2px; cursor: pointer; }
+  ul.list input { width: 20px; height: 20px; accent-color: var(--ok); flex: none; }
+  ul.list .qty { margin-left: auto; color: var(--muted); white-space: nowrap; }
+  ul.list li.done span { text-decoration: line-through; color: var(--muted); }
+  h3 { font-size: .85rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted);
+       margin: 16px 0 4px; }
+  .note { font-size: .8rem; color: var(--muted); margin-top: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Ramaka</h1>
+  <p>Choisis tes plats, ta liste de courses se fait toute seule.</p>
+</header>
+
+<main>
+  <section>
+    <h2>1. Chercher une recette</h2>
+    <form class="search" id="searchForm">
+      <input type="search" id="q" placeholder="ex. chicken, pasta, curry…" autocomplete="off">
+      <button type="submit">Chercher</button>
+    </form>
+    <div class="results" id="results"></div>
+  </section>
+
+  <section>
+    <h2>2. Plats choisis</h2>
+    <div class="chosen" id="chosen"></div>
+    <div class="actions">
+      <button id="buildBtn" disabled>Faire la liste de courses</button>
+    </div>
+  </section>
+
+  <section id="listSection" hidden>
+    <h2>3. Liste de courses</h2>
+    <div id="list"></div>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const store = {
+  get(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; } },
+  set(key, value) { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} },
+};
+
+let chosen = store.get("ramaka:chosen", []);
+let checked = new Set(store.get("ramaka:checked", []));
+
+function escapeHtml(text) {
+  return String(text).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+// ---------------------------------------------------------- recherche
+$("searchForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const q = $("q").value.trim();
+  if (!q) return;
+  $("results").innerHTML = '<p class="status">Recherche…</p>';
+  try {
+    const response = await fetch(`recettes?q=${encodeURIComponent(q)}`);
+    if (!response.ok) throw new Error(response.status);
+    renderResults(await response.json());
+  } catch {
+    $("results").innerHTML = '<p class="status">La recherche a échoué. Réessaie dans un instant.</p>';
+  }
+});
+
+function renderResults(meals) {
+  if (!meals.length) {
+    $("results").innerHTML = '<p class="empty">Aucune recette trouvée. Les recettes sont en anglais : essaie « chicken » plutôt que « poulet ».</p>';
+    return;
+  }
+  $("results").innerHTML = meals.map((m, i) => `
+    <div class="meal">
+      <img src="${escapeHtml(m.image)}" alt="" loading="lazy">
+      <div class="info">
+        <div class="name">${escapeHtml(m.nom)}</div>
+        <div class="origin">${escapeHtml(m.origine || "")}</div>
+      </div>
+      <button class="ghost" data-i="${i}">${chosen.includes(m.nom) ? "Ajouté" : "Ajouter"}</button>
+    </div>`).join("");
+  $("results").querySelectorAll("button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const name = meals[btn.dataset.i].nom;
+      if (!chosen.includes(name)) { chosen.push(name); saveChosen(); }
+      btn.textContent = "Ajouté";
+    });
+  });
+}
+
+// ---------------------------------------------------------- plats choisis
+function saveChosen() { store.set("ramaka:chosen", chosen); renderChosen(); }
+
+function renderChosen() {
+  $("chosen").innerHTML = chosen.length
+    ? chosen.map((name, i) => `
+        <span class="chip">${escapeHtml(name)}
+          <button aria-label="Retirer" data-i="${i}">×</button></span>`).join("")
+    : '<p class="empty">Aucun plat pour l\'instant.</p>';
+  $("chosen").querySelectorAll("button").forEach((btn) => {
+    btn.addEventListener("click", () => { chosen.splice(btn.dataset.i, 1); saveChosen(); });
+  });
+  $("buildBtn").disabled = chosen.length === 0;
+}
+
+// ---------------------------------------------------------- liste de courses
+$("buildBtn").addEventListener("click", async () => {
+  $("listSection").hidden = false;
+  $("list").innerHTML = '<p class="status">Préparation de la liste…</p>';
+  const params = chosen.map((n) => "recette=" + encodeURIComponent(n)).join("&");
+  try {
+    const response = await fetch(`liste-de-courses?${params}`);
+    if (!response.ok) throw new Error(response.status);
+    checked = new Set();
+    store.set("ramaka:checked", []);
+    const data = await response.json();
+    store.set("ramaka:list", data);
+    renderList(data);
+  } catch {
+    $("list").innerHTML = '<p class="status">Impossible de préparer la liste. Réessaie dans un instant.</p>';
+  }
+});
+
+function formatQty(item) {
+  if (item.quantite === null) return "";
+  const q = String(item.quantite).replace(".", ",");
+  return item.unite ? `${q} ${item.unite}` : q;
+}
+
+function renderList(data) {
+  const item = (key, label, qty) => `
+    <li class="${checked.has(key) ? "done" : ""}">
+      <label><input type="checkbox" data-key="${escapeHtml(key)}" ${checked.has(key) ? "checked" : ""}>
+        <span>${escapeHtml(label)}</span><span class="qty">${escapeHtml(qty)}</span></label>
+    </li>`;
+
+  let html = "<h3>À acheter</h3><ul class='list'>"
+    + data.a_acheter.map((i) => item("a:" + i.nom + i.unite, i.nom, formatQty(i))).join("")
+    + "</ul>";
+  if (data.a_verifier.length) {
+    html += "<h3>À vérifier dans le placard</h3><ul class='list'>"
+      + data.a_verifier.map((n) => item("v:" + n, n, "")).join("") + "</ul>";
+  }
+  if (data.non_traduits.length) {
+    html += `<p class="note">Pas encore traduits : ${data.non_traduits.map(escapeHtml).join(", ")}</p>`;
+  }
+  $("list").innerHTML = html;
+
+  $("list").querySelectorAll("input[type=checkbox]").forEach((box) => {
+    box.addEventListener("change", () => {
+      box.checked ? checked.add(box.dataset.key) : checked.delete(box.dataset.key);
+      box.closest("li").classList.toggle("done", box.checked);
+      store.set("ramaka:checked", [...checked]);
+    });
+  });
+}
+
+// ---------------------------------------------------------- au chargement
+renderChosen();
+const savedList = store.get("ramaka:list", null);
+if (savedList) { $("listSection").hidden = false; renderList(savedList); }
+</script>
+</body>
+</html>

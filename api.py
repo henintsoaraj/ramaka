@@ -1,5 +1,7 @@
 from fastapi import Query, FastAPI
-from shopping_list import fetch_recipe, aggregate, build_list, load_json
+from fastapi.responses import FileResponse
+from shopping_list import fetch_recipe, aggregate, build_list, load_json, SEARCH_URL
+import requests
 
 TRANSLATIONS = load_json("ingredients_fr.json")
 PANTRY = set(load_json("placard.json"))
@@ -25,3 +27,17 @@ def liste_de_courses(recette: list[str] = Query()):
         "a_verifier": to_check,
         "non_traduits": sorted(untranslated),
     }
+
+@app.get("/recettes")
+def recettes(q: str):
+    response = requests.get(SEARCH_URL, params={"s": q}, timeout=10)
+    response.raise_for_status()
+    meals = response.json().get("meals") or []      # null si rien trouvé
+    return [
+        {"nom": m["strMeal"], "image": m["strMealThumb"], "origine": m.get("strCountry")}
+        for m in meals
+    ]
+
+@app.get("/")
+def page():
+    return FileResponse("static/index.html")
