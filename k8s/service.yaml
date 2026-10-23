@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ramaka-api
+  namespace: ramaka
+spec:
+  type: ClusterIP
+  selector:
+    app: ramaka-api
+  ports:
+    - port: 80
+      targetPort: 8000

@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ramaka-api
+  namespace: ramaka
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ramaka-api
+  template:
+    metadata:
+      labels:
+        app: ramaka-api
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull            # le Secret que tu viens de créer
+      containers:
+        - name: api
+          image: ghcr.io/henintsoaraj/ramaka:d174aefe3b6d1f5c7a9ddffe45fd8a411d853088   # le SHA du commit publié
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /sante
+              port: 8000
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /sante
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
