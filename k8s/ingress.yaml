@@ -1,0 +1,24 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ramaka-api
+  namespace: ramaka
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-staging      # le nom de ton émetteur
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - ramaka-courses.duckdns.org
+      secretName: ramaka-tls                   # cert-manager y rangera le certificat
+  rules:
+    - host: ramaka-courses.duckdns.org
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ramaka-api
+                port:
+                  number: 80
