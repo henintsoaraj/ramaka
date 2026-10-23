@@ -4,7 +4,7 @@ metadata:
   name: ramaka-api
   namespace: ramaka
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-staging      # le nom de ton émetteur
+    cert-manager.io/cluster-issuer: letsencrypt-prod      # le nom de ton émetteur
 spec:
   ingressClassName: traefik
   tls:
